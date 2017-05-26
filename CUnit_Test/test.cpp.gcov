@@ -1,0 +1,196 @@
+        -:    0:Source:test.cpp
+        -:    0:Graph:test.gcno
+        -:    0:Data:test.gcda
+        -:    0:Runs:1
+        -:    0:Programs:1
+        -:    1:#include <CUnit/CUnit.h>
+        -:    2:#include <CUnit/TestDB.h>
+        -:    3:#include <CUnit/CUError.h>
+        -:    4:#include <CUnit/TestRun.h>
+        -:    5:#include <CUnit/Automated.h>
+        -:    6:#include <CUnit/Basic.h>
+        -:    7:#include <CUnit/Console.h>
+        -:    8:
+        -:    9:#include "StateTable.h"
+        -:   10:#include "Buffer.h"
+        -:   11:
+        1:   12:StateTable sm;
+        -:   13:Buffer* toSend;
+        -:   14:
+        6:   15:Signal_ST getSignal(char temp, char IdtoACK, Timer* t){
+        6:   16:	int rec_ret = 1;
+        6:   17:	unsigned char utemp = (unsigned char) temp;
+        -:   18:
+        6:   19:	if(rec_ret > 0){
+        6:   20:		unsigned char app = utemp>>7;
+        6:   21:		if(app == 0);
+        -:   22:		else {
+        2:   23:			app = utemp<<4;
+        2:   24:			if(app == 0){
+        2:   25:				app = utemp<<1;
+        2:   26:				app = app >> 5;
+        2:   27:				unsigned char Id = (unsigned char) IdtoACK;
+        2:   28:				if(app == Id)
+        1:   29:					return ack_id_correct;
+        -:   30:				else
+        1:   31:					return ack_id_incorrect;
+        -:   32:			}
+        -:   33:		}
+        -:   34:	}
+        -:   35:
+        4:   36:	if(t->active && t->count <= 0) return end_timer;
+        -:   37:
+        3:   38:	if(!toSend->isEmpty()) return msg_to_send;
+        -:   39:
+        1:   40:	return signal_tick;
+        -:   41:}
+        -:   42:
+        1:   43:int init_suite(void){
+        1:   44:	printf ("\nInitializing Suite_StateTable\n");
+        1:   45:	return 0;
+        -:   46:}
+        -:   47:
+        1:   48:int clean_suite(void){
+        1:   49:	printf ("\nCompleting Suite_StateTable\n");
+        1:   50:	return 0;
+        -:   51:}
+        -:   52:
+        -:   53://Function to check if for each entries of state table the action implemented
+        -:   54://is equal to the desired one
+        1:   55:void test_action(void){
+        -:   56:
+        1:   57:	CU_ASSERT(sm.dispatch1(wait_for_ACK, ack_id_correct) == remove_msg);
+        1:   58:	CU_ASSERT(sm.dispatch1(wait_for_ACK, ack_id_incorrect) == do_nothing);
+        1:   59:	CU_ASSERT(sm.dispatch1(wait_for_ACK, msg_to_send) == do_nothing);
+        1:   60:	CU_ASSERT(sm.dispatch1(wait_for_ACK, end_timer) == send_reset);
+        1:   61:	CU_ASSERT(sm.dispatch1(wait_for_ACK, signal_tick) == do_nothing);
+        -:   62:
+        1:   63:	CU_ASSERT(sm.dispatch1(wait_for_msg, ack_id_correct) == do_nothing);
+        1:   64:	CU_ASSERT(sm.dispatch1(wait_for_msg, ack_id_incorrect) == do_nothing);
+        1:   65:	CU_ASSERT(sm.dispatch1(wait_for_msg, msg_to_send) == send_start);
+        1:   66:	CU_ASSERT(sm.dispatch1(wait_for_msg, end_timer) == do_nothing);
+        1:   67:	CU_ASSERT(sm.dispatch1(wait_for_msg, signal_tick) == do_nothing);
+        1:   68:}
+        -:   69:
+        -:   70://Function to check if for each entries of state table the transaction implemented
+        -:   71://is equal to the desired one
+        1:   72:void test_transaction(void){
+        -:   73:
+        1:   74:	CU_ASSERT(sm.dispatch2(wait_for_ACK, ack_id_correct) == wait_for_msg);
+        1:   75:	CU_ASSERT(sm.dispatch2(wait_for_ACK, ack_id_incorrect) == wait_for_ACK);
+        1:   76:	CU_ASSERT(sm.dispatch2(wait_for_ACK, msg_to_send) == wait_for_ACK);
+        1:   77:	CU_ASSERT(sm.dispatch2(wait_for_ACK, end_timer) == wait_for_ACK);
+        1:   78:	CU_ASSERT(sm.dispatch2(wait_for_ACK, signal_tick) == wait_for_ACK);
+        -:   79:
+        1:   80:	CU_ASSERT(sm.dispatch2(wait_for_msg, ack_id_correct) == wait_for_msg);
+        1:   81:	CU_ASSERT(sm.dispatch2(wait_for_msg, ack_id_incorrect) == wait_for_msg);
+        1:   82:	CU_ASSERT(sm.dispatch2(wait_for_msg, msg_to_send) == wait_for_ACK);
+        1:   83:	CU_ASSERT(sm.dispatch2(wait_for_msg, end_timer) == wait_for_msg);
+        1:   84:	CU_ASSERT(sm.dispatch2(wait_for_msg, signal_tick) == wait_for_msg);
+        1:   85:}
+        -:   86:
+        1:   87:void test_getSignal(){
+        -:   88:
+        -:   89:	//We receive a byte from the Xbee and we check if the byte is an ACK (MSB = 1)
+        -:   90:	//and if it is an ACK we the Id inside this byte
+        -:   91:
+        -:   92:	//TEST CASE: suppose we are waiting the ACK 101
+        -:   93:	//CASE 1: we receive 0xD0 that it is 1101000 so we assume to receive "ack_id_correct"
+        -:   94:	//CASE 2: we receive 0xF0 that it is 1111000 so we assume to receive "ack_id_incorrect"
+        1:   95:	CU_ASSERT(getSignal(0xD0, 0x05, sm.timer) == ack_id_correct);
+        1:   96:	CU_ASSERT(getSignal(0xF0, 0x05, sm.timer) == ack_id_incorrect);
+        -:   97:
+        -:   98:	//Now we receive a byte that it isn't an ACK (MAB = 0) so we can check if there is
+        -:   99:	//a message in the buffer or if the timer is over
+        -:  100:	//
+        -:  101:	//TEST CASE: we receive 0x50
+        -:  102:	//CASE 1: there is a msg inside the buffer and the timer is not over
+        -:  103:	//	      so we assume to receive "msg_to_send"
+        -:  104:	//CASE 2: there is a msg inside the buffer but the timer is over
+        -:  105:	//		   so we assume to receive "end_timer"
+        -:  106:	//CASE 3: there isn't any msg insede the buffer and the timer in not over
+        -:  107:	//		  so we assume to receive "signal_tick"
+        1:  108:	CU_ASSERT(getSignal(0x50, 0x05, sm.timer) == msg_to_send);
+        1:  109:	sm.timer->count = -1;
+        1:  110:	CU_ASSERT(getSignal(0x50, 0x05, sm.timer) == end_timer);
+        1:  111:	sm.timer->count = 1;
+        1:  112:	toSend->remove();
+        1:  113:	CU_ASSERT(getSignal(0x50, 0x05, sm.timer) == signal_tick);
+        -:  114:
+        1:  115:}
+        -:  116:
+        -:  117://In this the we check the behavior of the full implementation of the dispatch function
+        -:  118://We put one value in the buffer and we assume to be in "wait_for_msg" state
+        -:  119://at the and of the simulation we assumeto be in "wait_to_ACK" with an empty buffer.
+        -:  120://During the elaboration we check the result of the getSignal
+        1:  121:void test_dispatch(){
+        1:  122:	char msg[3] = {0x80,0x35,0x72};
+        1:  123:	toSend->add(msg);
+        -:  124:
+        1:  125:	char Id = 0x00;
+        -:  126:
+        1:  127:	sm.current_state = wait_for_msg;
+        1:  128:	Signal_ST s = getSignal(0x00, 0x00, sm.timer);
+        1:  129:	sm.dispatch(s, msg, toSend, &Id);
+        -:  130:
+        1:  131:	CU_ASSERT_EQUAL(sm.current_state, wait_for_ACK);
+        1:  132:}
+        -:  133:
+        1:  134:int main (void)
+        -:  135:{
+        1:  136:   CU_pSuite pSuite = NULL;
+        -:  137:
+        1:  138:   sm.init();
+        1:  139:   sm.timer->active_timer();
+        1:  140:   sm.timer->count = 1;
+        -:  141:
+        1:  142:   toSend = new Buffer();
+        1:  143:   char msg[3] = {0x80,0x00,0x00};
+        1:  144:   toSend->add(msg);
+        -:  145:
+        -:  146:   /* Initialize CUnit test registry */
+        1:  147:   if (CUE_SUCCESS != CU_initialize_registry())
+    #####:  148:      return CU_get_error();
+        -:  149:
+        -:  150:   /* Add suite to registry */
+        1:  151:   pSuite = CU_add_suite("Suite_StateTable", init_suite, clean_suite);
+        1:  152:   if (NULL == pSuite) {
+    #####:  153:      CU_cleanup_registry();
+    #####:  154:      return CU_get_error();
+        -:  155:      }
+        -:  156:
+        -:  157:   /* add test to suite */
+        1:  158:   if ((NULL == CU_add_test(pSuite, "Test_Action_StateTable", test_action)))
+        -:  159:   {
+    #####:  160:      CU_cleanup_registry();
+    #####:  161:      return CU_get_error();
+        -:  162:   }
+        -:  163:
+        -:  164:   /* add test to suite */
+        1:  165:   if ((NULL == CU_add_test(pSuite, "Test_Transiction_StateTable", test_transaction)))
+        -:  166:   {
+    #####:  167:      CU_cleanup_registry();
+    #####:  168:      return CU_get_error();
+        -:  169:   }
+        -:  170:   /* add test to suite */
+        1:  171:   if ((NULL == CU_add_test(pSuite, "Test_getSignal", test_getSignal)))
+        -:  172:   {
+    #####:  173:      CU_cleanup_registry();
+    #####:  174:      return CU_get_error();
+        -:  175:   }
+        -:  176:
+        -:  177:   /* add test to suite */
+        1:  178:   if ((NULL == CU_add_test(pSuite, "Test_dispatch", test_dispatch)))
+        -:  179:   {
+    #####:  180:      CU_cleanup_registry();
+    #####:  181:      return CU_get_error();
+        -:  182:   }
+        -:  183:
+        -:  184:   /* Run tests using Basic interface */
+        1:  185:   CU_basic_set_mode(CU_BRM_VERBOSE);
+        1:  186:   CU_basic_run_tests();
+        -:  187:
+        -:  188:   /* Clean up registry and return */
+        1:  189:   CU_cleanup_registry();
+        1:  190:   return CU_get_error();
+        3:  191:}

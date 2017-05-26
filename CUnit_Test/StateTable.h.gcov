@@ -1,0 +1,49 @@
+        -:    0:Source:StateTable.h
+        -:    0:Graph:test.gcno
+        -:    0:Data:test.gcda
+        -:    0:Runs:1
+        -:    0:Programs:1
+        -:    1:/*
+        -:    2: * StateTable.h
+        -:    3: *
+        -:    4: *  Created on: 28 apr 2016
+        -:    5: *      Author: andrea
+        -:    6: */
+        -:    7:
+        -:    8:#ifndef SERIAL_STATETABLE_H_
+        -:    9:#define SERIAL_STATETABLE_H_
+        -:   10:
+        -:   11:#include "Timer.h"
+        -:   12:#include "Buffer.h"
+        -:   13:
+        -:   14:enum State_ST {wait_for_ACK, wait_for_msg, null, MAX_STATE};
+        -:   15:enum Signal_ST {ack_id_correct, ack_id_incorrect, msg_to_send, end_timer, signal_tick, MAX_SIGNAL};
+        -:   16:enum action_ST {do_nothing, remove_msg, send_start, send_reset};
+        -:   17:
+        -:   18:typedef struct{
+        -:   19:	action_ST actionToDo;
+        -:   20:	State_ST nextState;
+        -:   21:}ActionState;
+        -:   22:
+        1:   23:class StateTable{
+        -:   24:
+        -:   25:public:
+        -:   26:
+        -:   27:	State_ST current_state;
+        -:   28:
+        -:   29:	ActionState myTable[MAX_STATE][MAX_SIGNAL] = {
+        -:   30:		{ {remove_msg,wait_for_msg}, {do_nothing,wait_for_ACK}, {do_nothing,wait_for_ACK}, {send_reset, wait_for_ACK}, {do_nothing,wait_for_ACK} },
+        -:   31:		{ {do_nothing,wait_for_msg}, {do_nothing,wait_for_msg}, {send_start,wait_for_ACK}, {do_nothing, wait_for_msg}, {do_nothing,wait_for_msg} },
+        -:   32:	};
+        -:   33:
+        -:   34:	Timer* timer;
+        -:   35:
+        -:   36:	void init();
+        -:   37:	void dispatch(Signal_ST, char*, Buffer*, char*);
+        -:   38:	action_ST dispatch1(State_ST, Signal_ST);
+        -:   39:	State_ST dispatch2(State_ST, Signal_ST);
+        -:   40:	void tran(State_ST);
+        -:   41:
+        -:   42:};
+        -:   43:
+        -:   44:#endif /* SERIAL_STATETABLE_H_ */
